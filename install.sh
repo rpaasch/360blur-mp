@@ -276,9 +276,35 @@ for dir in "uploads" "processed" "status" "models" "cloudflare" "systemd"; do
     fi
 done
 
-echo -e "${GREEN}${BOLD}Basic uninstallation completed!${NC}"
-echo -e "You may want to manually check for any remaining files in: $INSTALL_DIR"
-echo -e "${YELLOW}To fully remove the application, check for systemd services:${NC}"
+# Remove common Python and config files
+echo "Removing application files..."
+find "$INSTALL_DIR" -maxdepth 1 -name "*.py" -delete
+find "$INSTALL_DIR" -maxdepth 1 -name "*.sh" -delete
+find "$INSTALL_DIR" -maxdepth 1 -name "*.md" -delete
+find "$INSTALL_DIR" -maxdepth 1 -name "*.ini" -delete
+find "$INSTALL_DIR" -maxdepth 1 -name "*.pot" -delete
+find "$INSTALL_DIR" -maxdepth 1 -name "*.cfg" -delete
+
+# Ask if the user wants to remove the entire directory
+echo -e "Do you want to remove the entire 360blur directory? (y/n) [y]: "
+read -p "" REMOVE_DIR
+REMOVE_DIR=${REMOVE_DIR:-"y"}
+
+if [[ $REMOVE_DIR =~ ^[Yy]$ ]]; then
+    # Make sure we're not in the installation directory
+    current_dir=$(pwd)
+    if [[ "$current_dir" == "$INSTALL_DIR" ]]; then
+        echo "Moving out of installation directory first..."
+        cd "$HOME"
+    fi
+    
+    echo "Removing installation directory completely..."
+    rm -rf "$INSTALL_DIR"
+    echo -e "${GREEN}Installation directory removed${NC}"
+fi
+
+echo -e "${GREEN}${BOLD}Uninstallation completed!${NC}"
+echo -e "${YELLOW}Note: If you installed systemd services, you should also run:${NC}"
 echo -e "  sudo systemctl disable 360blur.service (if installed)"
 echo -e "  sudo systemctl disable cloudflared-360blur.service (if installed)"
 EOL

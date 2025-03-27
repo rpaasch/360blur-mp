@@ -211,25 +211,35 @@ if [[ $REMOVE_FILES =~ ^[Yy]$ ]]; then
     
     echo -e "${GREEN}✓ 360blur files removed${NC}"
     
-    # Spørg om hele mappen skal fjernes hvis tom
-    if [ "$(ls -A "$INSTALL_DIR")" ]; then
-        echo -e "${YELLOW}The installation directory is not empty.${NC}"
-        echo -e "You may want to check for remaining files at $INSTALL_DIR"
+    # Spørg om hele mappen skal fjernes uanset om den er tom eller ej
+    remaining_files=$(ls -A "$INSTALL_DIR" | wc -l)
+    
+    if [ "$remaining_files" -gt 0 ]; then
+        echo -e "${YELLOW}The installation directory still contains $remaining_files items.${NC}"
     else
-        echo -e "\nThe installation directory is now empty."
-        echo -e "Do you want to remove the directory as well? (y/n) [n]: "
-        read -p "" REMOVE_DIR
-        REMOVE_DIR=${REMOVE_DIR:-"n"}
-        
-        if [[ $REMOVE_DIR =~ ^[Yy]$ ]]; then
-            # Sikrer at vi ikke er i mappen før vi sletter den
+        echo -e "${YELLOW}The installation directory is now empty.${NC}"
+    fi
+    
+    echo -e "Do you want to remove the entire 360blur directory? (y/n) [y]: "
+    read -p "" REMOVE_DIR
+    REMOVE_DIR=${REMOVE_DIR:-"y"}  # Default er ja nu
+    
+    if [[ $REMOVE_DIR =~ ^[Yy]$ ]]; then
+        # Tjek om vi står i installationsmappen
+        current_dir=$(pwd)
+        if [[ "$current_dir" == "$INSTALL_DIR" || "$current_dir" == "$INSTALL_DIR"/* ]]; then
+            echo -e "${YELLOW}Moving out of the installation directory before removing it...${NC}"
             cd "$HOME"
-            if rm -rf "$INSTALL_DIR"; then
-                echo -e "${GREEN}✓ Installation directory removed${NC}"
-            else
-                echo -e "${RED}Failed to remove directory${NC}"
-            fi
         fi
+        
+        if rm -rf "$INSTALL_DIR"; then
+            echo -e "${GREEN}✓ Installation directory completely removed${NC}"
+        else
+            echo -e "${RED}Failed to remove directory. You may need to remove it manually:${NC}"
+            echo -e "  rm -rf $INSTALL_DIR"
+        fi
+    else
+        echo -e "${YELLOW}Installation directory kept at $INSTALL_DIR${NC}"
     fi
 fi
 
