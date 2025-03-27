@@ -217,6 +217,432 @@ EOL
     echo -e "${GREEN}✓ Created start_blur360.sh${NC}"
 fi
 
+# Tilbyd avanceret konfiguration
+echo -e "\n${BLUE}${BOLD}Do you want to configure advanced options? (y/n) [n]:${NC} "
+read -p "" CONFIGURE_ADVANCED
+CONFIGURE_ADVANCED=${CONFIGURE_ADVANCED:-"n"}
+
+if [[ $CONFIGURE_ADVANCED =~ ^[Yy]$ ]]; then
+    echo -e "\n${BLUE}Server Configuration${NC}"
+    
+    # Konfigurer IP og port
+    echo -e "Which interface should the server bind to?"
+    echo -e "  1) localhost only (127.0.0.1) - Most secure, accessible only from this computer"
+    echo -e "  2) All interfaces (0.0.0.0) - Accessible from other devices on your network"
+    echo -e "  3) Specific IP address - Bind to a specific network interface"
+    echo -e "Enter your choice [1]: "
+    read -p "" BIND_CHOICE
+    BIND_CHOICE=${BIND_CHOICE:-"1"}
+    
+    case $BIND_CHOICE in
+        1) HOST="127.0.0.1" ;;
+        2) HOST="0.0.0.0" ;;
+        3) 
+            echo -e "Enter the IP address to bind to: "
+            read -p "" HOST
+            HOST=${HOST:-"127.0.0.1"}
+            ;;
+        *) HOST="127.0.0.1" ;;
+    esac
+    
+    echo -e "Enter the port number for the server [5000]: "
+    read -p "" PORT
+    PORT=${PORT:-"5000"}
+    
+    # Opdater config.ini
+    CONFIG_FILE="$INSTALL_DIR/config.ini"
+    if [[ -f "$CONFIG_FILE" ]]; then
+        # Update existing config
+        sed -i.bak "s/host = .*/host = $HOST/g" "$CONFIG_FILE"
+        sed -i.bak "s/port = .*/port = $PORT/g" "$CONFIG_FILE"
+        rm -f "${CONFIG_FILE}.bak"
+    else
+        # Create new config
+        cat > "$CONFIG_FILE" << EOL
+[server]
+# Host setting: 
+# - Use 127.0.0.1 for local access only
+# - Use 0.0.0.0 to allow access from other computers on your network
+# - Use a specific IP to bind to that address
+host = $HOST
+
+# Port number
+port = $PORT
+
+# Debug mode (True/False)
+debug = False
+
+[processing]
+# Maximum number of parallel processes for video processing
+# Default: Set to number of CPU cores - 1
+# max_workers = 3
+
+# Default language
+language = da
+
+# Enable detailed logging
+verbose_logging = False
+
+[cloudflare]
+# Set to True to enable CloudFlare Tunnel integration
+enabled = False
+
+# CloudFlare Tunnel token (if using token authentication)
+# token = your_cloudflare_token
+
+# CloudFlare hostname (e.g. your-tunnel.domain.com)
+# hostname = your-tunnel.domain.com
+EOL
+    fi
+    
+    # Offer systemd service setup on Linux
+    if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v systemctl &> /dev/null; then
+        echo -e "\n${BLUE}Would you like to set up 360blur as a systemd service? (y/n) [n]:${NC} "
+        read -p "" SETUP_SERVICE
+        SETUP_SERVICE=${SETUP_SERVICE:-"n"}
+        
+        if [[ $SETUP_SERVICE =~ ^[Yy]$ ]]; then
+            # Create systemd directory if it doesn't exist
+            if [[ ! -d "$INSTALL_DIR/systemd" ]]; then
+                mkdir -p "$INSTALL_DIR/systemd"
+            fi
+            
+            # Create service file
+            cat > "$INSTALL_DIR/systemd/360blur.service" << EOL
+[Unit]
+Description=360blur Video Processing Service
+After=network.target
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=$INSTALL_DIR
+ExecStart=$INSTALL_DIR/venv/bin/python $INSTALL_DIR/blur360_webapp.py
+Restart=on-failure
+RestartSec=5s
+Environment=PYTHONUNBUFFERED=1
+
+# Security options
+NoNewPrivileges=true
+ProtectSystem=full
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
+EOL
+            
+            # Create setup script
+            cat > "$INSTALL_DIR/systemd/setup_service.sh" << 'EOL'
+#!/bin/bash
+#
+# Setup script for 360blur systemd service
+#
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get the installation directory from the first argument or use current directory
+INSTALLDIR=${1:-$(pwd)}
+USER=$(whoami)
+
+echo -e "${BLUE}Setting up 360blur systemd service${NC}"
+echo -e "Installation directory: ${INSTALLDIR}"
+echo -e "Service will run as user: ${USER}"
+
+# Check if systemd is available
+if ! command -v systemctl &> /dev/null; then
+    echo -e "${RED}Error: systemd is not available on this system${NC}"
+    echo -e "This script only works on systems using systemd (most modern Linux distributions)"
+    exit 1
+fi
+
+# Check if user has sudo privileges
+if ! sudo -v &> /dev/null; then
+    echo -e "${RED}Error: You need sudo privileges to install a systemd service${NC}"
+    exit 1
+fi
+
+# Create a copy of the service file with proper paths
+SERVICE_FILE="${INSTALLDIR}/systemd/360blur.service"
+TMP_SERVICE_FILE="/tmp/360blur.service"
+
+if [ ! -f "$SERVICE_FILE" ]; then
+    echo -e "${RED}Error: Service template file not found at ${SERVICE_FILE}${NC}"
+    exit 1
+fi
+
+# Replace placeholders in the service file
+cat "$SERVICE_FILE" | sed "s|%INSTALLDIR%|${INSTALLDIR}|g" | sed "s|%USER%|${USER}|g" > "$TMP_SERVICE_FILE"
+
+# Install the service
+echo -e "${BLUE}Installing systemd service...${NC}"
+sudo cp "$TMP_SERVICE_FILE" /etc/systemd/system/360blur.service
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to install service file${NC}"
+    exit 1
+fi
+
+# Reload systemd configuration
+echo -e "${BLUE}Reloading systemd configuration...${NC}"
+sudo systemctl daemon-reload
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to reload systemd configuration${NC}"
+    exit 1
+fi
+
+# Enable the service
+echo -e "${BLUE}Enabling 360blur service...${NC}"
+sudo systemctl enable 360blur.service
+if [ $? -ne 0 ]; then
+    echo -e "${RED}Failed to enable service${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}360blur service has been successfully installed and enabled!${NC}"
+echo -e "You can now manage the service using the following commands:"
+echo -e "  ${YELLOW}sudo systemctl start 360blur${NC} - Start the service"
+echo -e "  ${YELLOW}sudo systemctl stop 360blur${NC} - Stop the service"
+echo -e "  ${YELLOW}sudo systemctl restart 360blur${NC} - Restart the service"
+echo -e "  ${YELLOW}sudo systemctl status 360blur${NC} - Check service status"
+echo -e "  ${YELLOW}sudo journalctl -u 360blur${NC} - View service logs"
+
+echo -e "\nDo you want to start the service now? (y/n) [y]: "
+read -r START_SERVICE
+START_SERVICE=${START_SERVICE:-"y"}
+
+if [[ $START_SERVICE =~ ^[Yy]$ ]]; then
+    echo -e "${BLUE}Starting 360blur service...${NC}"
+    sudo systemctl start 360blur.service
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}Service started successfully!${NC}"
+        echo -e "You can access 360blur at http://localhost:5000"
+    else
+        echo -e "${RED}Failed to start service${NC}"
+        echo -e "Please check the service status with: sudo systemctl status 360blur.service"
+    fi
+fi
+
+# Clean up
+rm -f "$TMP_SERVICE_FILE"
+EOL
+            
+            chmod +x "$INSTALL_DIR/systemd/setup_service.sh"
+            
+            echo -e "\n${GREEN}Systemd service files have been created${NC}"
+            echo -e "To install the service, run:"
+            echo -e "${CYAN}  cd $INSTALL_DIR/systemd && ./setup_service.sh $INSTALL_DIR${NC}"
+        fi
+    fi
+    
+    # Offer CloudFlare tunnel setup
+    echo -e "\n${BLUE}Would you like to set up CloudFlare Tunnel for remote access? (y/n) [n]:${NC} "
+    read -p "" SETUP_CLOUDFLARE
+    SETUP_CLOUDFLARE=${SETUP_CLOUDFLARE:-"n"}
+    
+    if [[ $SETUP_CLOUDFLARE =~ ^[Yy]$ ]]; then
+        # Create cloudflare directory if it doesn't exist
+        if [[ ! -d "$INSTALL_DIR/cloudflare" ]]; then
+            mkdir -p "$INSTALL_DIR/cloudflare"
+        fi
+        
+        # Create setup script
+        cat > "$INSTALL_DIR/cloudflare/setup_cloudflare.sh" << 'EOL'
+#!/bin/bash
+#
+# Setup script for 360blur CloudFlare Tunnel
+#
+
+# Colors for output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Get the installation directory from the first argument or use current directory
+INSTALLDIR=${1:-$(pwd)}
+CONFIG_FILE="${INSTALLDIR}/config.ini"
+CLOUDFLARED_CONFIG="${INSTALLDIR}/cloudflare/cloudflared_config.yaml"
+
+echo -e "${BLUE}Setting up 360blur CloudFlare Tunnel${NC}"
+echo -e "Installation directory: ${INSTALLDIR}"
+
+# Check if cloudflared is installed
+if ! command -v cloudflared &> /dev/null; then
+    echo -e "${YELLOW}CloudFlare Tunnel client (cloudflared) is not installed${NC}"
+    echo -e "Would you like to install it now? (y/n) [y]: "
+    read -r INSTALL_CLOUDFLARED
+    INSTALL_CLOUDFLARED=${INSTALL_CLOUDFLARED:-"y"}
+    
+    if [[ $INSTALL_CLOUDFLARED =~ ^[Yy]$ ]]; then
+        echo -e "${BLUE}Installing CloudFlare Tunnel client...${NC}"
+        
+        # Detect OS and install cloudflared
+        if [[ "$OSTYPE" == "linux-gnu"* ]]; then
+            # Linux
+            if command -v apt-get &> /dev/null; then
+                # Debian/Ubuntu
+                echo -e "Detected Debian/Ubuntu system"
+                curl -L --output cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+                sudo apt-get update && sudo apt-get install -y ./cloudflared.deb
+                rm cloudflared.deb
+            elif command -v yum &> /dev/null; then
+                # RHEL/CentOS/Fedora
+                echo -e "Detected RHEL/CentOS/Fedora system"
+                curl -L --output cloudflared.rpm https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-x86_64.rpm
+                sudo yum install -y ./cloudflared.rpm
+                rm cloudflared.rpm
+            else
+                echo -e "${RED}Unsupported Linux distribution${NC}"
+                echo -e "Please install cloudflared manually from https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation"
+                exit 1
+            fi
+        elif [[ "$OSTYPE" == "darwin"* ]]; then
+            # macOS
+            echo -e "Detected macOS system"
+            if command -v brew &> /dev/null; then
+                brew install cloudflare/cloudflare/cloudflared
+            else
+                echo -e "${RED}Homebrew is not installed${NC}"
+                echo -e "Please install Homebrew first (https://brew.sh/) or install cloudflared manually"
+                exit 1
+            fi
+        else
+            echo -e "${RED}Unsupported operating system: $OSTYPE${NC}"
+            echo -e "Please install cloudflared manually from https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation"
+            exit 1
+        fi
+        
+        # Check if installation was successful
+        if ! command -v cloudflared &> /dev/null; then
+            echo -e "${RED}Failed to install cloudflared${NC}"
+            exit 1
+        else
+            echo -e "${GREEN}CloudFlare Tunnel client installed successfully${NC}"
+        fi
+    else
+        echo -e "${RED}CloudFlare Tunnel client is required for this setup${NC}"
+        exit 1
+    fi
+fi
+
+# Create directory for CloudFlare configuration
+mkdir -p "${INSTALLDIR}/cloudflare"
+
+# Ask for CloudFlare tunnel details
+echo -e "\n${BLUE}CloudFlare Tunnel Configuration${NC}"
+echo -e "Do you have an existing CloudFlare Tunnel token? (y/n) [n]: "
+read -r HAS_TOKEN
+HAS_TOKEN=${HAS_TOKEN:-"n"}
+
+if [[ $HAS_TOKEN =~ ^[Yy]$ ]]; then
+    echo -e "Please enter your CloudFlare Tunnel token: "
+    read -r TUNNEL_TOKEN
+    
+    # Create cloudflared config
+    cat > "$CLOUDFLARED_CONFIG" << EOY
+tunnel: ${TUNNEL_TOKEN}
+credentials-file: ${HOME}/.cloudflared/${TUNNEL_TOKEN}.json
+logfile: ${INSTALLDIR}/cloudflare/cloudflared.log
+
+ingress:
+  - hostname: 360blur.example.com
+    service: http://localhost:5000
+  - service: http_status:404
+EOY
+
+    echo -e "${BLUE}Enter your CloudFlare hostname (e.g., 360blur.example.com):${NC} "
+    read -r HOSTNAME
+    
+    # Update hostname in config
+    sed -i.bak "s/360blur.example.com/$HOSTNAME/g" "$CLOUDFLARED_CONFIG"
+    rm -f "${CLOUDFLARED_CONFIG}.bak"
+    
+    # Update config.ini
+    sed -i.bak "s/enabled = False/enabled = True/g" "$CONFIG_FILE"
+    sed -i.bak "s/# token = your_cloudflare_token/token = $TUNNEL_TOKEN/g" "$CONFIG_FILE"
+    sed -i.bak "s/# hostname = your-tunnel.domain.com/hostname = $HOSTNAME/g" "$CONFIG_FILE"
+    rm -f "${CONFIG_FILE}.bak"
+    
+    echo -e "${GREEN}CloudFlare Tunnel configuration completed!${NC}"
+    echo -e "Configuration files:"
+    echo -e "  - CloudFlare config: ${CLOUDFLARED_CONFIG}"
+    echo -e "  - 360blur config: ${CONFIG_FILE}"
+    
+    # Create systemd service for cloudflared
+    if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v systemctl &> /dev/null; then
+        echo -e "\nDo you want to set up a systemd service for CloudFlare Tunnel? (y/n) [y]: "
+        read -r SETUP_SERVICE
+        SETUP_SERVICE=${SETUP_SERVICE:-"y"}
+        
+        if [[ $SETUP_SERVICE =~ ^[Yy]$ ]]; then
+            CLOUDFLARE_SERVICE_FILE="${INSTALLDIR}/cloudflare/cloudflared.service"
+            
+            # Create service file
+            cat > "$CLOUDFLARE_SERVICE_FILE" << EOT
+[Unit]
+Description=CloudFlare Tunnel for 360blur
+After=network.target
+
+[Service]
+Type=simple
+User=$(whoami)
+WorkingDirectory=${INSTALLDIR}/cloudflare
+ExecStart=/usr/bin/cloudflared tunnel --config ${CLOUDFLARED_CONFIG} run
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target
+EOT
+            
+            # Install service
+            sudo cp "$CLOUDFLARE_SERVICE_FILE" /etc/systemd/system/cloudflared-360blur.service
+            sudo systemctl daemon-reload
+            sudo systemctl enable cloudflared-360blur.service
+            
+            echo -e "${GREEN}CloudFlare Tunnel systemd service has been set up${NC}"
+            echo -e "You can now manage the service using the following commands:"
+            echo -e "  ${YELLOW}sudo systemctl start cloudflared-360blur${NC} - Start the tunnel"
+            echo -e "  ${YELLOW}sudo systemctl stop cloudflared-360blur${NC} - Stop the tunnel"
+            echo -e "  ${YELLOW}sudo systemctl status cloudflared-360blur${NC} - Check tunnel status"
+            
+            echo -e "\nDo you want to start the CloudFlare Tunnel now? (y/n) [y]: "
+            read -r START_TUNNEL
+            START_TUNNEL=${START_TUNNEL:-"y"}
+            
+            if [[ $START_TUNNEL =~ ^[Yy]$ ]]; then
+                sudo systemctl start cloudflared-360blur.service
+                echo -e "${GREEN}CloudFlare Tunnel started!${NC}"
+                echo -e "Your 360blur instance should now be accessible at https://${HOSTNAME}"
+            fi
+        fi
+    else
+        echo -e "\n${BLUE}To start the CloudFlare Tunnel, run:${NC}"
+        echo -e "  ${YELLOW}cloudflared tunnel --config ${CLOUDFLARED_CONFIG} run${NC}"
+    fi
+else
+    echo -e "${YELLOW}CloudFlare Tunnel setup requires a token${NC}"
+    echo -e "To create a tunnel and get a token, visit https://dash.cloudflare.com/ and follow these steps:"
+    echo -e "1. Go to Zero Trust > Access > Tunnels"
+    echo -e "2. Click 'Create a tunnel'"
+    echo -e "3. Follow the instructions to create a tunnel and get a token"
+    echo -e "4. Run this script again with your token"
+fi
+EOL
+        
+        chmod +x "$INSTALL_DIR/cloudflare/setup_cloudflare.sh"
+        
+        echo -e "\n${GREEN}CloudFlare Tunnel setup script has been created${NC}"
+        echo -e "To set up CloudFlare Tunnel, run:"
+        echo -e "${CYAN}  cd $INSTALL_DIR/cloudflare && ./setup_cloudflare.sh $INSTALL_DIR${NC}"
+    fi
+fi
+
 # Færdig!
 echo -e "\n${GREEN}${BOLD}Installation complete!${NC}"
 echo -e "To start 360blur, navigate to the installation directory and run:"
@@ -236,6 +662,25 @@ else
     echo -e "${CYAN}  cd $INSTALL_DIR && ./start_blur360.sh${NC}"
 fi
 
-echo -e "\nOpen http://localhost:5000 in your browser after starting."
+# Vis korrekt URL baseret på host/port konfiguration
+if [[ -f "$CONFIG_FILE" ]]; then
+    HOST=$(grep "host" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
+    PORT=$(grep "port" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
+    if [[ "$HOST" == "0.0.0.0" ]]; then
+        IP=$(hostname -I | awk '{print $1}')
+        echo -e "\nAfter starting, access the application at:"
+        echo -e "${CYAN}  http://$IP:$PORT${NC} (from any device on your network)"
+        echo -e "${CYAN}  http://localhost:$PORT${NC} (from this computer)"
+    elif [[ "$HOST" == "127.0.0.1" ]]; then
+        echo -e "\nAfter starting, access the application at:"
+        echo -e "${CYAN}  http://localhost:$PORT${NC} (from this computer only)"
+    else
+        echo -e "\nAfter starting, access the application at:"
+        echo -e "${CYAN}  http://$HOST:$PORT${NC}"
+    fi
+else
+    echo -e "\nOpen http://localhost:5000 in your browser after starting."
+fi
+
 echo -e "\n${PURPLE}Thank you for installing 360blur!${NC}"
 echo -e "${CYAN}For updates and documentation, visit https://github.com/rpaasch/360blur-mp${NC}"

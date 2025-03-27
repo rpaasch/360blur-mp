@@ -16,6 +16,7 @@ import json
 import datetime
 import inspect
 import re
+import configparser
 from pathlib import Path
 from flask_socketio import SocketIO
 from flask_babel import Babel
@@ -36,11 +37,39 @@ except ImportError:
     ULTRALYTICS_AVAILABLE = False
     print("Ultralytics YOLO not available. Will use OpenCV DNN if possible.")
 
+# Load configuration from config.ini if it exists
+config = configparser.ConfigParser()
+config_file = Path('config.ini')
+if config_file.exists():
+    logger.info(f"Loading configuration from {config_file}")
+    config.read(config_file)
+else:
+    logger.info("No config.ini found, using default settings")
+    # Set default configuration
+    config['server'] = {
+        'host': '127.0.0.1',
+        'port': '5000',
+        'debug': 'False'
+    }
+    config['processing'] = {
+        'language': 'da',
+        'verbose_logging': 'False'
+    }
+    config['cloudflare'] = {
+        'enabled': 'False'
+    }
+    
+    # Save default configuration
+    with open(config_file, 'w') as f:
+        config.write(f)
+    logger.info(f"Created default configuration file at {config_file}")
+
+# Initialize Flask app
 app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['UPLOAD_FOLDER'] = "uploads"
 app.config['PROCESSED_FOLDER'] = "processed"
-app.config['BABEL_DEFAULT_LOCALE'] = 'da'
+app.config['BABEL_DEFAULT_LOCALE'] = config.get('processing', 'language', fallback='da')
 app.config['BABEL_TRANSLATION_DIRECTORIES'] = 'translations'
 app.config['SUPPORTED_LANGUAGES'] = {
     'da': 'Dansk',
@@ -50,6 +79,11 @@ app.config['SUPPORTED_LANGUAGES'] = {
     'it': 'Italiano',
     'bg': 'Български'
 }
+
+# Server configuration
+app.config['HOST'] = config.get('server', 'host', fallback='127.0.0.1')
+app.config['PORT'] = config.getint('server', 'port', fallback=5000)
+app.config['DEBUG'] = config.getboolean('server', 'debug', fallback=False)
 
 UPLOAD_FOLDER = app.config['UPLOAD_FOLDER']
 PROCESSED_FOLDER = app.config['PROCESSED_FOLDER']
@@ -2608,25 +2642,46 @@ if __name__ == '__main__':
             print("For license plate detection, download YOLOv3 models trained for license plates")
             print("and place them in the 'models' directory as 'yolov3_lp.cfg' and 'yolov3_lp.weights'")
         
-        print(f"\nStarting server on http://0.0.0.0:5002")
+        # Get server configuration
+        host = app.config['HOST']
+        port = app.config['PORT']
+        debug = app.config['DEBUG']
+        
+        # Check for CloudFlare configuration
+        cloudflare_enabled = config.getboolean('cloudflare', 'enabled', fallback=False)
+        cloudflare_hostname = config.get('cloudflare', 'hostname', fallback=None)
+        
+        if cloudflare_enabled and cloudflare_hostname:
+            print(f"\nStarting server with CloudFlare Tunnel enabled")
+            print(f"Your 360blur instance will be accessible at https://{cloudflare_hostname}")
+            # When using CloudFlare, we bind only to localhost
+            host = '127.0.0.1'
+        
+        print(f"\nStarting server on http://{host}:{port}")
         print(f"Press Ctrl+C to stop the server")
+        
+        # Check if we're binding to all interfaces
+        if host == '0.0.0.0':
+            print(f"Server will be accessible from other devices on your network")
+            local_ip = socket.gethostbyname(socket.gethostname())
+            print(f"You can access it at http://{local_ip}:{port}")
         
         # Run with Socket.IO
         # Different versions of Flask-SocketIO have different APIs
         try:
             # Newer versions
             print("Starting Socket.IO server with WebSocket support...")
-            socketio.run(app, host='0.0.0.0', port=5002, debug=True, allow_unsafe_werkzeug=True)
+            socketio.run(app, host=host, port=port, debug=debug, allow_unsafe_werkzeug=True)
         except TypeError:
             try:
                 # Older versions
-                socketio.run(app, host='0.0.0.0', port=5002, debug=True)
+                socketio.run(app, host=host, port=port, debug=debug)
             except Exception as e:
                 print(f"Error starting SocketIO: {e}")
                 print("Falling back to regular Flask server")
-                app.run(host='0.0.0.0', port=5002, debug=True)
+                app.run(host=host, port=port, debug=debug)
     except OSError as e:
         logging.error(f"Could not start server: {e}")
-        print("Check if port 5002 is already in use, or if you have permissions to bind to the address.")
-        print("Try a different port: python blur360_webapp.py --port=8080")
+        print(f"Check if port {port} is already in use, or if you have permissions to bind to the address.")
+        print("To use a different port, edit the config.ini file and change the port setting.")
 
