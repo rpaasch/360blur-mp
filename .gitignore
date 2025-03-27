@@ -1,0 +1,36 @@
+# Mapper med upload og processerede filer
+uploads/*
+processed/*
+status/*
+
+# Virtual environment
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# IDE-filer
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS-genererede filer
+.DS_Store
+Thumbs.db
+ehthumbs.db
+
+# Undtag modeleksempelfiler fra ignore
+!models/deploy.prototxt
+!models/yolov3_lp.cfg.example
+
+# Inkludér tomme mapper med .gitkeep
+!uploads/.gitkeep
+!processed/.gitkeep
+!status/.gitkeep
