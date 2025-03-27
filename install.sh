@@ -197,7 +197,7 @@ else
 fi
 
 # Opret startup script
-echo -e "\n${BLUE}${BOLD}Creating startup script...${NC}"
+echo -e "\n${BLUE}${BOLD}Creating startup and uninstall scripts...${NC}"
 if [[ "$OSTYPE" == "win"* ]]; then
     # Windows batch fil
     cat > start_blur360.bat << 'EOL'
@@ -215,6 +215,26 @@ python blur360_webapp.py
 EOL
     chmod +x start_blur360.sh
     echo -e "${GREEN}✓ Created start_blur360.sh${NC}"
+    
+    # Opret også et lokalt uninstall script
+    cat > uninstall.sh << 'EOL'
+#!/bin/bash
+# Script til at afinstallere 360blur
+# For at bruge det, kør ./uninstall.sh
+
+# Find den inkluderet uninstaller
+script_path=$(dirname "$0")
+full_path="$script_path/uninstall.sh"
+
+if [ -f "$full_path" ]; then
+    bash "$full_path"
+else
+    echo "Error: Uninstall script not found!"
+    echo "Please download the uninstaller from: https://github.com/rpaasch/360blur-mp/blob/main/uninstall.sh"
+fi
+EOL
+    chmod +x uninstall.sh
+    echo -e "${GREEN}✓ Created uninstall.sh${NC}"
 fi
 
 # Tilbyd avanceret konfiguration

@@ -2,6 +2,10 @@
 
 En webapplikation til automatisk detektering og sløring af ansigter og nummerplader i 360° panoramiske videoer.
 
+[![Installation](https://img.shields.io/badge/Installation-One%20Line-green.svg)](https://github.com/rpaasch/360blur-mp#installation)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20macOS%20%7C%20Windows-blue.svg)](https://github.com/rpaasch/360blur-mp#installation)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 ## Funktioner
 
 - Upload og behandling af 360° videoer (MP4-format)
@@ -57,6 +61,11 @@ Alternativt med wget:
 /bin/bash -c "$(wget -qO- https://raw.githubusercontent.com/rpaasch/360blur-mp/main/install-remote.sh)"
 ```
 
+Installationsscriptet giver mulighed for avancerede indstillinger, herunder:
+- Konfiguration af værtsnavn og port
+- Opsætning som systemd-service (Linux)
+- Integration med CloudFlare Tunnel for fjernbetjening
+
 ### Manuel installation
 
 1. Clone eller download repository:
@@ -94,6 +103,17 @@ python blur360_webapp.py
 ```
 
 7. Åbn i browser: `http://localhost:5000`
+
+### Afinstallation
+
+Hvis du vil fjerne 360blur, kan du bruge det medfølgende afinstallationsscript:
+
+```bash
+cd /sti/til/360blur
+./uninstall.sh
+```
+
+Afinstallationsscriptet vil fjerne alle programfiler, systemd-services, og konfiguration. Du vil blive spurgt om du vil beholde en backup af dine processerede videoer.
 
 ## Brug
 
