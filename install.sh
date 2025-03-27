@@ -54,9 +54,36 @@ INSTALL_DIR=${INSTALL_DIR:-"./360blur"}
 
 # Konverter relativ sti til absolut
 INSTALL_DIR=$(eval echo "$INSTALL_DIR")
-mkdir -p "$INSTALL_DIR"
-cd "$INSTALL_DIR"
-echo -e "${GREEN}✓ Installation directory: $INSTALL_DIR${NC}"
+
+# Tjek om destinationen kan oprettes/bruges
+if [[ "$INSTALL_DIR" == /* ]]; then
+    # Absolut sti - tjek skriverettigheder
+    if [[ ! -d $(dirname "$INSTALL_DIR") ]]; then
+        echo -e "${YELLOW}Warning: Parent directory $(dirname "$INSTALL_DIR") does not exist${NC}"
+    fi
+    
+    if [[ ! -w $(dirname "$INSTALL_DIR") ]]; then
+        echo -e "${RED}Error: No write permission to create directory at $INSTALL_DIR${NC}"
+        echo -e "${YELLOW}Please choose a directory in your home folder like ~/360blur or ./360blur${NC}"
+        read -p "New installation directory: " INSTALL_DIR
+        INSTALL_DIR=${INSTALL_DIR:-"./360blur"}
+        INSTALL_DIR=$(eval echo "$INSTALL_DIR")
+    fi
+fi
+
+# Create directory and change to it
+if mkdir -p "$INSTALL_DIR"; then
+    cd "$INSTALL_DIR" || {
+        echo -e "${RED}Error: Could not change to $INSTALL_DIR${NC}"
+        exit 1
+    }
+    echo -e "${GREEN}✓ Installation directory: $INSTALL_DIR${NC}"
+else
+    echo -e "${RED}Error: Could not create $INSTALL_DIR${NC}"
+    echo -e "${YELLOW}Installing to current directory instead${NC}"
+    INSTALL_DIR=$(pwd)
+    echo -e "${GREEN}✓ Using current directory: $INSTALL_DIR${NC}"
+fi
 
 # Hent kildekode
 echo -e "\n${BLUE}${BOLD}Downloading source code...${NC}"

@@ -25,9 +25,8 @@ echo -e "${CYAN}Remote Installer for 360blur Video Processing Tool${NC}"
 echo -e "${CYAN}         https://github.com/rpaasch/360blur-mp${NC}"
 echo ""
 
-# Opret en midlertidig mappe
-TMP_DIR=$(mktemp -d)
-cd "$TMP_DIR"
+# Sikre at vi er i en læsbar mappe (brugeren's hjemmemappe)
+cd "$HOME" || cd /tmp
 
 # Download installer script
 echo -e "${BLUE}${BOLD}Downloading installer script...${NC}"
@@ -55,6 +54,5 @@ echo -e "${GREEN}✓ Installer downloaded. Starting installation...${NC}"
 echo ""
 ./install.sh
 
-# Ryd op efter os selv
-cd - > /dev/null
-rm -rf "$TMP_DIR"
+# Installation er færdig - ingen behov for yderligere oprydning
+echo -e "${GREEN}Remote installation completed${NC}"
