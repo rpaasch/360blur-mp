@@ -134,17 +134,18 @@ Afinstallationsscriptet vil fjerne alle programfiler, systemd-services, og konfi
 2. Et domæne registreret hos CloudFlare (eller et subdomæne af dit eksisterende domæne)
 3. Et CloudFlare Tunnel-token oprettet i CloudFlare-dashboardet
 
-### Sådan opretter du en CloudFlare Tunnel:
+### Sådan opretter du en CloudFlare Tunnel (2025):
 
-1. Gå til [CloudFlare Dashboard](https://dash.cloudflare.com/)
-2. Naviger til Zero Trust > Access > Tunnels
-3. Klik på "Create a tunnel" og følg instruktionerne
-4. Vælg "Manual" installationsmetoden og kopier dit token
-5. Vend tilbage til din 360blur-installation og kør:
+1. Gå direkte til [CloudFlare Zero Trust Dashboard](https://one.dash.cloudflare.com/)
+2. Klik på "Tunnels" i venstremenuen
+3. Klik på "Create a tunnel" og giv tunnelen et navn
+4. Vælg "Manual" som installationsmetode
+5. Kopiér det viste tunnel-token
+6. Vend tilbage til din 360blur-installation og kør:
    ```
    cd /sti/til/360blur/cloudflare && ./setup_cloudflare.sh /sti/til/360blur
    ```
-6. Følg anvisningerne for at indtaste dit token og domæne
+7. Følg anvisningerne for at indtaste dit token og domæne
 
 ### Adgang til din 360blur-instans via CloudFlare:
 
@@ -163,8 +164,11 @@ Hvis ansigter eller nummerplader ikke detekteres korrekt:
 
 1. Kontroller at CloudFlare-tunnelen kører med `sudo systemctl status cloudflared-360blur` (Linux)
 2. Tjek tunnellogfilen i `/sti/til/360blur/cloudflare/cloudflared.log`
-3. Verificer at dit domæne er korrekt konfigureret i CloudFlare-dashboardet
-4. Sørg for at porten i 360blur's config.ini matcher den port, der er angivet i CloudFlare-konfigurationen
+3. Verificer at dit domæne er korrekt konfigureret i CloudFlare Zero Trust dashboardet
+4. Gå til [CloudFlare Zero Trust Dashboard](https://one.dash.cloudflare.com/) > Tunnels
+5. Tjek at tunnelen er markeret som "Active" 
+6. Klik på tunnelens navn og tjek "Public Hostnames" konfigurationen
+7. Sørg for at porten i 360blur's config.ini matcher den port, der er angivet i CloudFlare-konfigurationen
 
 ## Begrænsninger
 

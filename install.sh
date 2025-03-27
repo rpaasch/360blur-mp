@@ -521,12 +521,13 @@ EOL
         echo -e "1. A CloudFlare account (free)"
         echo -e "2. A domain registered with CloudFlare (or a subdomain of your existing domain)"
         echo -e "3. A CloudFlare Tunnel token that you'll create in the CloudFlare dashboard\n"
-        echo -e "${YELLOW}Steps to get your CloudFlare Tunnel token:${NC}"
-        echo -e "1. Go to ${CYAN}https://dash.cloudflare.com/${NC}"
-        echo -e "2. Navigate to Zero Trust > Access > Tunnels"
-        echo -e "3. Click 'Create a tunnel' and follow the instructions"
-        echo -e "4. Select the 'Manual' installation method and copy your token"
-        echo -e "5. Use this token during the 360blur CloudFlare setup\n"
+        echo -e "${YELLOW}Steps to get your CloudFlare Tunnel token (2025):${NC}"
+        echo -e "1. Go to ${CYAN}https://one.dash.cloudflare.com/${NC} and log in"
+        echo -e "2. Click on 'Tunnels' in the left sidebar"
+        echo -e "3. Click 'Create a tunnel' and give it a name"
+        echo -e "4. Select the 'Manual' installation method"
+        echo -e "5. Copy your tunnel token when shown"
+        echo -e "6. Use this token during the 360blur CloudFlare setup\n"
         
         # Create cloudflare directory if it doesn't exist
         if [[ ! -d "$INSTALL_DIR/cloudflare" ]]; then
