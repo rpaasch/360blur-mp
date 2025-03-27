@@ -26,8 +26,14 @@ build/
 Thumbs.db
 ehthumbs.db
 
-# Undtag modeleksempelfiler fra ignore
+# Modelfiler (store binærfiler)
+models/*.weights
+models/*.pt
+models/*.caffemodel
+
+# Undtag modeleksempelfiler og konfigurationer fra ignore
 !models/deploy.prototxt
+!models/yolov3_lp.cfg
 !models/yolov3_lp.cfg.example
 
 # Inkludér tomme mapper med .gitkeep
