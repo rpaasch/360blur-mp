@@ -216,25 +216,75 @@ EOL
     chmod +x start_blur360.sh
     echo -e "${GREEN}✓ Created start_blur360.sh${NC}"
     
-    # Opret også et lokalt uninstall script
-    cat > uninstall.sh << 'EOL'
+    # Create a symlink to the actual uninstall script
+    if [ -f uninstall.sh ]; then
+        chmod +x uninstall.sh
+        echo -e "${GREEN}✓ Uninstall script is ready${NC}"
+    else
+        echo -e "${YELLOW}Warning: Uninstall script was not found${NC}"
+        # Create a minimal uninstall script that gives instructions
+        cat > uninstall.sh << 'EOL'
 #!/bin/bash
 # Script til at afinstallere 360blur
 # For at bruge det, kør ./uninstall.sh
 
-# Find den inkluderet uninstaller
-script_path=$(dirname "$0")
-full_path="$script_path/uninstall.sh"
+# Colors
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
 
-if [ -f "$full_path" ]; then
-    bash "$full_path"
-else
-    echo "Error: Uninstall script not found!"
-    echo "Please download the uninstaller from: https://github.com/rpaasch/360blur-mp/blob/main/uninstall.sh"
+echo -e "${BLUE}${BOLD}"
+echo "   ____    __    ___    ____   _       _     _   ____    "
+echo "  |___ /  / /_  / _ \\  | __ ) | |     | |   | | |  _ \\   "
+echo "    |_ \\ | '_ \\| | | | |  _ \\ | |     | |   | | | |_) |  "
+echo "   ___) || (_) | |_| | | |_) || |___  | |___| | |  _ <   "
+echo "  |____/  \\___/ \\___/  |____/ |_____| |_____|_| |_| \\_\\  "
+echo -e "${NC}"
+echo -e "${RED}         Uninstaller for 360blur${NC}"
+
+# Get current directory
+INSTALL_DIR=$(pwd)
+
+# Ask for confirmation
+echo -e "${YELLOW}${BOLD}WARNING: This will uninstall 360blur and remove all related files from:${NC}"
+echo -e "${BLUE}$INSTALL_DIR${NC}"
+read -p "Are you sure you want to continue? (y/n) [n]: " CONFIRM
+CONFIRM=${CONFIRM:-"n"}
+
+if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
+    echo -e "${GREEN}Uninstallation cancelled${NC}"
+    exit 0
 fi
+
+# Perform basic uninstallation
+echo -e "\n${BLUE}${BOLD}Uninstalling 360blur...${NC}"
+
+# Remove virtual environment
+if [ -d "$INSTALL_DIR/venv" ]; then
+    echo "Removing virtual environment..."
+    rm -rf "$INSTALL_DIR/venv"
+fi
+
+# Remove data directories
+for dir in "uploads" "processed" "status" "models" "cloudflare" "systemd"; do
+    if [ -d "$INSTALL_DIR/$dir" ]; then
+        echo "Removing $dir directory..."
+        rm -rf "$INSTALL_DIR/$dir"
+    fi
+done
+
+echo -e "${GREEN}${BOLD}Basic uninstallation completed!${NC}"
+echo -e "You may want to manually check for any remaining files in: $INSTALL_DIR"
+echo -e "${YELLOW}To fully remove the application, check for systemd services:${NC}"
+echo -e "  sudo systemctl disable 360blur.service (if installed)"
+echo -e "  sudo systemctl disable cloudflared-360blur.service (if installed)"
 EOL
-    chmod +x uninstall.sh
-    echo -e "${GREEN}✓ Created uninstall.sh${NC}"
+        chmod +x uninstall.sh
+        echo -e "${GREEN}✓ Created basic uninstall.sh${NC}"
+    fi
 fi
 
 # Tilbyd avanceret konfiguration
@@ -459,11 +509,25 @@ EOL
     fi
     
     # Offer CloudFlare tunnel setup
-    echo -e "\n${BLUE}Would you like to set up CloudFlare Tunnel for remote access? (y/n) [n]:${NC} "
+    echo -e "\n${BLUE}${BOLD}Would you like to set up CloudFlare Tunnel for remote access? (y/n) [n]:${NC} "
     read -p "" SETUP_CLOUDFLARE
     SETUP_CLOUDFLARE=${SETUP_CLOUDFLARE:-"n"}
     
     if [[ $SETUP_CLOUDFLARE =~ ^[Yy]$ ]]; then
+        echo -e "\n${YELLOW}=== CloudFlare Tunnel Information ===${NC}"
+        echo -e "CloudFlare Tunnels allow secure remote access to your 360blur instance from anywhere"
+        echo -e "without port forwarding or exposing your IP address."
+        echo -e "\n${YELLOW}Prerequisites:${NC}"
+        echo -e "1. A CloudFlare account (free)"
+        echo -e "2. A domain registered with CloudFlare (or a subdomain of your existing domain)"
+        echo -e "3. A CloudFlare Tunnel token that you'll create in the CloudFlare dashboard\n"
+        echo -e "${YELLOW}Steps to get your CloudFlare Tunnel token:${NC}"
+        echo -e "1. Go to ${CYAN}https://dash.cloudflare.com/${NC}"
+        echo -e "2. Navigate to Zero Trust > Access > Tunnels"
+        echo -e "3. Click 'Create a tunnel' and follow the instructions"
+        echo -e "4. Select the 'Manual' installation method and copy your token"
+        echo -e "5. Use this token during the 360blur CloudFlare setup\n"
+        
         # Create cloudflare directory if it doesn't exist
         if [[ ! -d "$INSTALL_DIR/cloudflare" ]]; then
             mkdir -p "$INSTALL_DIR/cloudflare"
@@ -684,19 +748,52 @@ fi
 
 # Vis korrekt URL baseret på host/port konfiguration
 if [[ -f "$CONFIG_FILE" ]]; then
-    HOST=$(grep "host" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
-    PORT=$(grep "port" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
+    # Try to extract configuration values safely
+    HOST=$(grep "^host" "$CONFIG_FILE" | head -n 1 | cut -d'=' -f2 | tr -d ' ' 2>/dev/null)
+    PORT=$(grep "^port" "$CONFIG_FILE" | head -n 1 | cut -d'=' -f2 | tr -d ' ' 2>/dev/null)
+    
+    # Set defaults if not found
+    HOST=${HOST:-"127.0.0.1"}
+    PORT=${PORT:-"5000"}
+    
+    # Check if CloudFlare is enabled (properly)
+    CLOUDFLARE_ENABLED=$(grep "^enabled = True" "$CONFIG_FILE" 2>/dev/null)
+    
+    # Extract hostname only if not commented
+    CLOUDFLARE_HOSTNAME=""
+    if grep "^hostname = " "$CONFIG_FILE" | grep -v "^#" &>/dev/null; then
+        CLOUDFLARE_HOSTNAME=$(grep "^hostname = " "$CONFIG_FILE" | grep -v "^#" | head -n 1 | cut -d'=' -f2 | tr -d ' ' 2>/dev/null)
+    fi
+    
+    # Handle CloudFlare separately from regular access
+    echo -e "\n${GREEN}${BOLD}== Access Information ==${NC}"
+    
+    # Always show local access information
+    echo -e "${BOLD}Local access:${NC}"
     if [[ "$HOST" == "0.0.0.0" ]]; then
-        IP=$(hostname -I | awk '{print $1}')
-        echo -e "\nAfter starting, access the application at:"
-        echo -e "${CYAN}  http://$IP:$PORT${NC} (from any device on your network)"
+        # Try to get IP address safely
+        IP=$(hostname -I 2>/dev/null | awk '{print $1}' 2>/dev/null)
+        if [[ -n "$IP" ]]; then
+            echo -e "${CYAN}  http://$IP:$PORT${NC} (from any device on your network)"
+        fi
         echo -e "${CYAN}  http://localhost:$PORT${NC} (from this computer)"
     elif [[ "$HOST" == "127.0.0.1" ]]; then
-        echo -e "\nAfter starting, access the application at:"
         echo -e "${CYAN}  http://localhost:$PORT${NC} (from this computer only)"
     else
-        echo -e "\nAfter starting, access the application at:"
         echo -e "${CYAN}  http://$HOST:$PORT${NC}"
+    fi
+    
+    # Show CloudFlare information if enabled and configured
+    if [[ -n "$CLOUDFLARE_ENABLED" && -n "$CLOUDFLARE_HOSTNAME" ]]; then
+        echo -e "\n${BOLD}CloudFlare tunnel:${NC}"
+        echo -e "${YELLOW}To complete CloudFlare setup, run:${NC}"
+        echo -e "${CYAN}  cd $INSTALL_DIR/cloudflare && ./setup_cloudflare.sh $INSTALL_DIR${NC}"
+        echo -e "\n${YELLOW}After configuration, your instance will be accessible at:${NC}"
+        echo -e "${CYAN}  https://$CLOUDFLARE_HOSTNAME${NC}"
+    elif [[ -n "$CLOUDFLARE_ENABLED" ]]; then
+        echo -e "\n${BOLD}CloudFlare tunnel:${NC}"
+        echo -e "${YELLOW}To complete CloudFlare setup, run:${NC}"
+        echo -e "${CYAN}  cd $INSTALL_DIR/cloudflare && ./setup_cloudflare.sh $INSTALL_DIR${NC}"
     fi
 else
     echo -e "\nOpen http://localhost:5000 in your browser after starting."

@@ -64,7 +64,7 @@ Alternativt med wget:
 Installationsscriptet giver mulighed for avancerede indstillinger, herunder:
 - Konfiguration af værtsnavn og port
 - Opsætning som systemd-service (Linux)
-- Integration med CloudFlare Tunnel for fjernbetjening
+- Integration med CloudFlare Tunnel for fjernbetjening og sikker adgang udefra
 
 ### Manuel installation
 
@@ -124,6 +124,32 @@ Afinstallationsscriptet vil fjerne alle programfiler, systemd-services, og konfi
 5. Følg fremskridtet i realtid via progressbaren
 6. Download den færdige video, når behandlingen er fuldført
 
+## CloudFlare Tunnel Integration
+
+360blur understøtter integration med CloudFlare Tunnels, hvilket giver sikker fjernadgang til din 360blur-instans fra hvor som helst i verden uden behov for port forwarding eller at eksponere din IP-adresse.
+
+### Forudsætninger for CloudFlare Tunnel:
+
+1. En CloudFlare-konto (gratis)
+2. Et domæne registreret hos CloudFlare (eller et subdomæne af dit eksisterende domæne)
+3. Et CloudFlare Tunnel-token oprettet i CloudFlare-dashboardet
+
+### Sådan opretter du en CloudFlare Tunnel:
+
+1. Gå til [CloudFlare Dashboard](https://dash.cloudflare.com/)
+2. Naviger til Zero Trust > Access > Tunnels
+3. Klik på "Create a tunnel" og følg instruktionerne
+4. Vælg "Manual" installationsmetoden og kopier dit token
+5. Vend tilbage til din 360blur-installation og kør:
+   ```
+   cd /sti/til/360blur/cloudflare && ./setup_cloudflare.sh /sti/til/360blur
+   ```
+6. Følg anvisningerne for at indtaste dit token og domæne
+
+### Adgang til din 360blur-instans via CloudFlare:
+
+Efter konfiguration vil din 360blur-instans være tilgængelig på den URL, du har angivet under opsætningen (f.eks. `https://360blur.mitdomæne.com`).
+
 ## Fejlfinding
 
 Hvis ansigter eller nummerplader ikke detekteres korrekt:
@@ -133,8 +159,16 @@ Hvis ansigter eller nummerplader ikke detekteres korrekt:
 3. For bedre nummerpladedetektering, installer ultralytics (YOLO)
 4. Tjek logfilen for eventuelle fejlmeddelelser
 
+### CloudFlare Tunnel fejlfinding:
+
+1. Kontroller at CloudFlare-tunnelen kører med `sudo systemctl status cloudflared-360blur` (Linux)
+2. Tjek tunnellogfilen i `/sti/til/360blur/cloudflare/cloudflared.log`
+3. Verificer at dit domæne er korrekt konfigureret i CloudFlare-dashboardet
+4. Sørg for at porten i 360blur's config.ini matcher den port, der er angivet i CloudFlare-konfigurationen
+
 ## Begrænsninger
 
 - Behandling af store 360° videoer kan være tidskrævende
 - Ansigtsgenkendelse i 360° videoer er udfordrende på grund af forvrængning
 - Meget små objekter kan være svære at detektere pålideligt
+- CloudFlare Tunnel kræver et domæne, der er konfigureret med CloudFlare

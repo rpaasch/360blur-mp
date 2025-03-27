@@ -80,14 +80,34 @@ fi
 # Create directory for CloudFlare configuration
 mkdir -p "${INSTALLDIR}/cloudflare"
 
-# Ask for CloudFlare tunnel details
-echo -e "\n${BLUE}CloudFlare Tunnel Configuration${NC}"
-echo -e "Do you have an existing CloudFlare Tunnel token? (y/n) [n]: "
+# Show clear CloudFlare setup instructions 
+echo -e "\n${BLUE}${BOLD}CloudFlare Tunnel Configuration${NC}"
+echo -e "${YELLOW}=====================================================================${NC}"
+echo -e "CloudFlare Tunnels provide secure remote access to your 360blur instance"
+echo -e "without exposing your IP address or opening ports on your firewall."
+echo -e "\n${YELLOW}Before proceeding, you'll need:${NC}"
+echo -e "1. A CloudFlare account (free at cloudflare.com)"
+echo -e "2. A domain registered with CloudFlare (or subdomain)"
+echo -e "3. A CloudFlare Tunnel token from your CloudFlare dashboard"
+echo -e "\n${BLUE}Do you have a CloudFlare account and domain already set up? (y/n) [n]:${NC} "
+read -r HAS_ACCOUNT
+HAS_ACCOUNT=${HAS_ACCOUNT:-"n"}
+
+if [[ ! $HAS_ACCOUNT =~ ^[Yy]$ ]]; then
+    echo -e "\n${YELLOW}Please create a CloudFlare account and add your domain first:${NC}"
+    echo -e "1. Sign up at https://dash.cloudflare.com/sign-up"
+    echo -e "2. Add your domain to CloudFlare (or use an existing one)"
+    echo -e "3. Return to this setup script when finished"
+    echo -e "\n${BLUE}Press Enter to continue when ready, or Ctrl+C to exit...${NC}"
+    read
+fi
+
+echo -e "\n${BLUE}Do you have an existing CloudFlare Tunnel token? (y/n) [n]:${NC} "
 read -r HAS_TOKEN
 HAS_TOKEN=${HAS_TOKEN:-"n"}
 
 if [[ $HAS_TOKEN =~ ^[Yy]$ ]]; then
-    echo -e "Please enter your CloudFlare Tunnel token: "
+    echo -e "\n${YELLOW}Please enter your CloudFlare Tunnel token:${NC} "
     read -r TUNNEL_TOKEN
     
     # Create cloudflared config
@@ -102,11 +122,21 @@ ingress:
   - service: http_status:404
 EOL
 
-    echo -e "${BLUE}Enter your CloudFlare hostname (e.g., 360blur.example.com):${NC} "
+    echo -e "\n${YELLOW}Enter your CloudFlare hostname (e.g., 360blur.example.com):${NC} "
     read -r HOSTNAME
     
-    # Update hostname in config
+    # Extract port from config.ini if available
+    PORT="5000"  # Default port
+    if [[ -f "$CONFIG_FILE" ]]; then
+        CONFIG_PORT=$(grep "port" "$CONFIG_FILE" | cut -d'=' -f2 | tr -d ' ')
+        if [[ -n "$CONFIG_PORT" ]]; then
+            PORT="$CONFIG_PORT"
+        fi
+    fi
+    
+    # Update hostname in config and set service to use the correct port
     sed -i.bak "s/360blur.example.com/$HOSTNAME/g" "$CLOUDFLARED_CONFIG"
+    sed -i.bak "s|service: http://localhost:5000|service: http://localhost:$PORT|g" "$CLOUDFLARED_CONFIG"
     rm -f "${CLOUDFLARED_CONFIG}.bak"
     
     # Update config.ini
@@ -115,10 +145,13 @@ EOL
     sed -i.bak "s/# hostname = your-tunnel.domain.com/hostname = $HOSTNAME/g" "$CONFIG_FILE"
     rm -f "${CONFIG_FILE}.bak"
     
-    echo -e "${GREEN}CloudFlare Tunnel configuration completed!${NC}"
-    echo -e "Configuration files:"
+    echo -e "\n${GREEN}${BOLD}CloudFlare Tunnel configuration completed!${NC}"
+    echo -e "${YELLOW}Configuration files:${NC}"
     echo -e "  - CloudFlare config: ${CLOUDFLARED_CONFIG}"
     echo -e "  - 360blur config: ${CONFIG_FILE}"
+    echo -e "\n${YELLOW}Important:${NC} Your 360blur instance will be accessible at:"
+    echo -e "${CYAN}  https://$HOSTNAME${NC}"
+    echo -e "You may need to wait a few minutes for DNS propagation."
     
     # Create systemd service for cloudflared
     if [[ "$OSTYPE" == "linux-gnu"* ]] && command -v systemctl &> /dev/null; then
@@ -173,10 +206,46 @@ EOL
         echo -e "  ${YELLOW}cloudflared tunnel --config ${CLOUDFLARED_CONFIG} run${NC}"
     fi
 else
-    echo -e "${YELLOW}CloudFlare Tunnel setup requires a token${NC}"
-    echo -e "To create a tunnel and get a token, visit https://dash.cloudflare.com/ and follow these steps:"
-    echo -e "1. Go to Zero Trust > Access > Tunnels"
-    echo -e "2. Click 'Create a tunnel'"
-    echo -e "3. Follow the instructions to create a tunnel and get a token"
-    echo -e "4. Run this script again with your token"
+    echo -e "\n${YELLOW}${BOLD}CloudFlare Tunnel Setup Instructions${NC}"
+    echo -e "${YELLOW}=====================================================================${NC}"
+    echo -e "To create a tunnel and get a token, follow these detailed steps:"
+    echo -e "\n${CYAN}1. Log in to your CloudFlare dashboard:${NC}"
+    echo -e "   https://dash.cloudflare.com/"
+    echo -e "\n${CYAN}2. Navigate to CloudFlare Zero Trust:${NC}"
+    echo -e "   - Click on 'Zero Trust' in the sidebar or go to:"
+    echo -e "   - https://one.dash.cloudflare.com/"
+    echo -e "\n${CYAN}3. Create a new tunnel:${NC}"
+    echo -e "   - Go to Access > Tunnels"
+    echo -e "   - Click 'Create a tunnel'"
+    echo -e "   - Give your tunnel a name (e.g., '360blur')"
+    echo -e "\n${CYAN}4. Get your tunnel token:${NC}"
+    echo -e "   - On the installation page, select 'Linux'"
+    echo -e "   - Choose 'Install and run manually'"
+    echo -e "   - Look for your tunnel token in the command"
+    echo -e "   - It will look like: 'cloudflared service install YOUR_TOKEN_HERE'"
+    echo -e "\n${CYAN}5. Configure your tunnel:${NC}"
+    echo -e "   - Skip the CloudFlare installation steps (we handle this)"
+    echo -e "   - In 'Public Hostname' section, set up your domain"
+    echo -e "   - Enter a subdomain (e.g., '360blur')"
+    echo -e "   - Choose your domain from the dropdown"
+    echo -e "   - Set Type to 'HTTP'"
+    echo -e "   - Set URL to 'localhost:5000' (or your custom port)"
+    echo -e "   - Click Save"
+    echo -e "\n${YELLOW}After completing these steps, run this script again and enter your token${NC}"
+    
+    # Ask if they want to open browser to CloudFlare
+    echo -e "\n${BLUE}Would you like to open the CloudFlare dashboard in your browser now? (y/n) [y]:${NC} "
+    read -r OPEN_BROWSER
+    OPEN_BROWSER=${OPEN_BROWSER:-"y"}
+    
+    if [[ $OPEN_BROWSER =~ ^[Yy]$ ]]; then
+        if command -v xdg-open &> /dev/null; then
+            xdg-open "https://dash.cloudflare.com/" &
+        elif command -v open &> /dev/null; then
+            open "https://dash.cloudflare.com/"
+        else
+            echo -e "${YELLOW}Could not open browser automatically.${NC}"
+            echo -e "Please visit: ${CYAN}https://dash.cloudflare.com/${NC}"
+        fi
+    fi
 fi
