@@ -16,14 +16,14 @@ NC='\033[0m' # No Color
 
 # Banner
 echo -e "${BLUE}${BOLD}"
-echo "  ____    __    _____  ____  _     _     ____    "
-echo " |___ \  / /_  | ____|/ ___|| |   | |   |  _ \   "
-echo "   __) || '_ \ |  _|  \___ \| |   | |   | |_) |  "
-echo "  / __/ | (_) || |___  ___) | |___| |___|  _ <   "
-echo " |_____| \___/ |_____||____/|_____|_____|_| \_\  "
+echo "   ____    __    ___    ____   _       _     _   ____    "
+echo "  |___ /  / /_  / _ \\  | __ ) | |     | |   | | |  _ \\   "
+echo "    |_ \\ | '_ \\| | | | |  _ \\ | |     | |   | | | |_) |  "
+echo "   ___) || (_) | |_| | | |_) || |___  | |___| | |  _ <   "
+echo "  |____/  \\___/ \\___/  |____/ |_____| |_____|_| |_| \\_\\  "
 echo -e "${NC}"
-echo -e "${CYAN}       Video Processing for 360° Privacy${NC}"
-echo -e "${CYAN}        https://github.com/360blur-mp${NC}"
+echo -e "${CYAN}         Video Processing for 360° Privacy${NC}"
+echo -e "${CYAN}        https://github.com/rpaasch/360blur-mp${NC}"
 echo ""
 
 # Check for Python 3.9 eller højere
@@ -127,20 +127,29 @@ else
     exit 1
 fi
 
-# Installer YOLO (valgfrit)
-echo -e "\n${BLUE}${BOLD}Do you want to install YOLO for improved detection? (y/n) [y]:${NC} "
-read -p "" INSTALL_YOLO
-INSTALL_YOLO=${INSTALL_YOLO:-"y"}
-
-if [[ $INSTALL_YOLO =~ ^[Yy]$ ]]; then
-    echo "Installing YOLO..."
-    if pip install ultralytics>=8.0.0; then
-        echo -e "${GREEN}✓ YOLO installed${NC}"
-    else
-        echo -e "${YELLOW}⚠ Failed to install YOLO, will use OpenCV DNN instead${NC}"
-    fi
+# Installer YOLO (valgfrit) - tjek først om det allerede er installeret
+echo -e "\n${BLUE}${BOLD}Checking for YOLO (Ultralytics)...${NC}"
+if python -c "import ultralytics" &>/dev/null; then
+    echo -e "${GREEN}✓ YOLO (Ultralytics) is already installed${NC}"
+    YOLO_INSTALLED=true
 else
-    echo "Skipping YOLO installation, will use OpenCV DNN only."
+    echo -e "\n${BLUE}${BOLD}Do you want to install YOLO for improved detection? (y/n) [y]:${NC} "
+    read -p "" INSTALL_YOLO
+    INSTALL_YOLO=${INSTALL_YOLO:-"y"}
+
+    if [[ $INSTALL_YOLO =~ ^[Yy]$ ]]; then
+        echo "Installing YOLO..."
+        if pip install ultralytics>=8.0.0; then
+            echo -e "${GREEN}✓ YOLO installed${NC}"
+            YOLO_INSTALLED=true
+        else
+            echo -e "${YELLOW}⚠ Failed to install YOLO, will use OpenCV DNN instead${NC}"
+            YOLO_INSTALLED=false
+        fi
+    else
+        echo "Skipping YOLO installation, will use OpenCV DNN only."
+        YOLO_INSTALLED=false
+    fi
 fi
 
 # Download modeller
@@ -183,12 +192,21 @@ fi
 
 # Færdig!
 echo -e "\n${GREEN}${BOLD}Installation complete!${NC}"
-echo -e "To start 360blur, run:"
+echo -e "To start 360blur, navigate to the installation directory and run:"
 
 if [[ "$OSTYPE" == "win"* ]]; then
+    echo -e "${CYAN}  cd $INSTALL_DIR${NC}"
     echo -e "${CYAN}  start_blur360.bat${NC}"
 else
+    echo -e "${CYAN}  cd $INSTALL_DIR${NC}"
     echo -e "${CYAN}  ./start_blur360.sh${NC}"
+fi
+
+echo -e "\nOr for convenience, use this one-line command:"
+if [[ "$OSTYPE" == "win"* ]]; then
+    echo -e "${CYAN}  cd $INSTALL_DIR && start_blur360.bat${NC}"
+else
+    echo -e "${CYAN}  cd $INSTALL_DIR && ./start_blur360.sh${NC}"
 fi
 
 echo -e "\nOpen http://localhost:5000 in your browser after starting."
