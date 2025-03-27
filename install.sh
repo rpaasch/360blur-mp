@@ -321,13 +321,13 @@ if [[ $CONFIGURE_ADVANCED =~ ^[Yy]$ ]]; then
     
     # Opdater config.ini
     CONFIG_FILE="$INSTALL_DIR/config.ini"
-    if [[ -f "$CONFIG_FILE" ]]; then
-        # Update existing config
-        sed -i.bak "s/host = .*/host = $HOST/g" "$CONFIG_FILE"
-        sed -i.bak "s/port = .*/port = $PORT/g" "$CONFIG_FILE"
-        rm -f "${CONFIG_FILE}.bak"
-    else
-        # Create new config
+    
+    # Either create a new config file or modify the existing one
+    if [[ ! -f "$CONFIG_FILE" ]]; then
+        # Create directory if needed
+        mkdir -p "$(dirname "$CONFIG_FILE")"
+        
+        # Create initial config
         cat > "$CONFIG_FILE" << EOL
 [server]
 # Host setting: 
@@ -363,6 +363,44 @@ enabled = False
 # CloudFlare hostname (e.g. your-tunnel.domain.com)
 # hostname = your-tunnel.domain.com
 EOL
+    else
+        # Update existing config file
+        
+        # Create a temporary file
+        TMP_CONFIG="${CONFIG_FILE}.tmp"
+        
+        # Check if server section exists
+        if grep -q "^\[server\]" "$CONFIG_FILE"; then
+            # Update existing server settings
+            awk -v host="$HOST" -v port="$PORT" '
+            /^\[server\]/ { print; in_server = 1; next }
+            /^\[/ { in_server = 0 }  # New section starts
+            in_server && /^host =/ { print "host = " host; next }
+            in_server && /^port =/ { print "port = " port; next }
+            { print }
+            ' "$CONFIG_FILE" > "$TMP_CONFIG"
+        else
+            # Add server section if it doesn't exist
+            cat > "$TMP_CONFIG" << EOL
+[server]
+# Host setting: 
+# - Use 127.0.0.1 for local access only
+# - Use 0.0.0.0 to allow access from other computers on your network
+# - Use a specific IP to bind to that address
+host = $HOST
+
+# Port number
+port = $PORT
+
+# Debug mode (True/False)
+debug = False
+EOL
+            # Append the rest of the existing config
+            cat "$CONFIG_FILE" >> "$TMP_CONFIG"
+        fi
+        
+        # Replace original with updated config
+        mv "$TMP_CONFIG" "$CONFIG_FILE"
     fi
     
     # Offer systemd service setup on Linux

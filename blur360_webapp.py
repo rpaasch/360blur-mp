@@ -918,12 +918,12 @@ BASE_TEMPLATE = """
                                     if (estimatedTimeElement) {
                                         // Udtræk tid fra meddelelsen
                                         if (data.time.message.includes("min")) {
-                                            const match = data.time.message.match(/(\d+) min (\d+) sec/);
+                                            const match = data.time.message.match(/(\\d+) min (\\d+) sec/);
                                             if (match) {
                                                 estimatedTimeElement.textContent = `${match[1]} min ${match[2]} sec`;
                                             }
                                         } else {
-                                            const match = data.time.message.match(/(\d+) sec/);
+                                            const match = data.time.message.match(/(\\d+) sec/);
                                             if (match) {
                                                 estimatedTimeElement.textContent = `${match[1]} sec`;
                                             }
@@ -1224,7 +1224,7 @@ BASE_TEMPLATE = """
             addProcessingLogEntry(message);
             
             // Check if message contains time information and extract it
-            const timeRegex = /(\d+) min (\d+) sec remaining|(\d+) sec remaining/;
+            const timeRegex = /(\\d+) min (\\d+) sec remaining|(\\d+) sec remaining/;
             const timeMatch = message.match(timeRegex);
             
             // For debugging
@@ -1235,7 +1235,7 @@ BASE_TEMPLATE = """
             // need to extract it from messages anymore
             
             // Extract batch information if available
-            const batchRegex = /Processing frames (\d+)-(\d+) of (\d+)/;
+            const batchRegex = /Processing frames (\\d+)-(\\d+) of (\\d+)/;
             const batchMatch = message.match(batchRegex);
             if (batchMatch) {
                 const batchInfo = document.getElementById('batch-info');
@@ -2637,10 +2637,15 @@ if __name__ == '__main__':
             print("\nWARNING: DNN face detection model not found!")
             print("For better face detection, run: python download_models.py")
             
-        if not (Path("models/yolov3_lp.cfg").exists() and Path("models/yolov3_lp.weights").exists()):
-            print("\nWARNING: YOLO license plate model not found!")
-            print("For license plate detection, download YOLOv3 models trained for license plates")
-            print("and place them in the 'models' directory as 'yolov3_lp.cfg' and 'yolov3_lp.weights'")
+        # Check for either YOLOv3 or YOLOv8 license plate models
+        yolov3_available = Path("models/yolov3_lp.cfg").exists() and Path("models/yolov3_lp.weights").exists()
+        yolov8_available = Path("models/yolov8n_lp.pt").exists()
+        
+        if not (yolov3_available or yolov8_available):
+            print("\nWARNING: No YOLO license plate model found!")
+            print("For license plate detection, either:")
+            print("1. Run 'python download_models.py' to get the YOLOv8 model (recommended)")
+            print("2. Download YOLOv3 models and place them in 'models' as 'yolov3_lp.cfg' and 'yolov3_lp.weights'")
         
         # Get server configuration
         host = app.config['HOST']
